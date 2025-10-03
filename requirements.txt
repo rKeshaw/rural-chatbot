@@ -1,9 +1,20 @@
-torch
-torchaudio
-transformers
-datasets
-tokenizers
-ffmpeg-python
-soundfile
-numpy
+fastapi
+tavily-python
+uvicorn
+gradio
+httpx
+sentence-transformers
+faiss-cpu
+groq
+python-dotenv
+pysbd
+langchain
+langchain_groq
+langgraph
 
+# --- The Stable AI Stack ---
+TTS==0.22.0
+torch==2.1.2
+torchaudio==2.1.2
+transformers==4.36.2
+protobuf==3.20.0
