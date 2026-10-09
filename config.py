@@ -6,8 +6,7 @@ GROQ_MODEL_ID = "llama-3.1-8b-instant"
 WHISPER_MODEL_NAME = "base"
 TTS_VOICE_DIR = "./tts_voice/"
 SPEAKER_VOICE_DIR = "./speaker_voice/"
-# GROQ_WHISPER_MODEL_ID = "whisper-large-v3"
-GROQ_WHISPER_MODEL_ID = "mixtral-8x7b-32768"
+GROQ_WHISPER_MODEL_ID = "whisper-large-v3"
 # WHISPER_MODEL_NAME = "medium"
 # New configuration for our cloud-based TTS
 ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM" # This is the ID for the voice 'Rachel'

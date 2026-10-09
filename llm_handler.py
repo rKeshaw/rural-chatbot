@@ -1,5 +1,6 @@
 # llm_handler.py
 import os
+import requests
 from groq import Groq
 from dotenv import load_dotenv
 from tavily import TavilyClient
@@ -11,14 +12,23 @@ load_dotenv()
 
 class LLMHandler:
     def __init__(self):
-        groq_api_key = os.environ.get("GROQ_API_KEY")
-        tavily_api_key = os.environ.get("TAVILY_API_KEY")
-        if not groq_api_key or not tavily_api_key:
-            raise ValueError("API keys for Groq or Tavily not found in .env file.")
-        
-        self.client = Groq(api_key=groq_api_key)
-        self.tavily_client = TavilyClient(api_key=tavily_api_key)
-        print("✅ Groq and Tavily clients initialized.")
+        self.groq_api_key = os.environ.get("GROQ_API_KEY")
+        self.tavily_api_key = os.environ.get("TAVILY_API_KEY")
+
+        if self.groq_api_key:
+            self.client = Groq(api_key=self.groq_api_key)
+        else:
+            self.client = None
+            print("⚠️ GROQ_API_KEY not set. LLM features will be unavailable.")
+
+        if self.tavily_api_key:
+            self.tavily_client = TavilyClient(api_key=self.tavily_api_key)
+        else:
+            self.tavily_client = None
+            print("⚠️ TAVILY_API_KEY not set. Web search will be unavailable.")
+
+        if self.client and self.tavily_client:
+            print("✅ Groq and Tavily clients initialized.")
     
     def _get_current_time(self):
         """Gets the current time for the IST timezone."""
@@ -61,7 +71,7 @@ class LLMHandler:
             with open(audio_filepath, "rb") as file:
                 transcription = self.client.audio.transcriptions.create(
                     file=(audio_filepath, file.read()),
-                    model=GROQ_WHISPER_MODEL_ID,
+                    model="whisper-large-v3",
                     language="hi"
                 )
             print(f"Transcription successful: {transcription.text}")
