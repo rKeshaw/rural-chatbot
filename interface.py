@@ -70,11 +70,11 @@ class AssistantInterface:
 
     def build_ui(self):
         """Builds the Gradio Blocks UI with the 'Read Aloud' button."""
-        with gr.Blocks(theme="soft", title="Gram Sahayak") as chat_ui:
+        with gr.Blocks(title="Gram Sahayak") as chat_ui:
             gr.Markdown("# 🌾 Gram Sahayak")
             last_response_state = gr.State("")
             session_id_state = gr.State("")
-            chatbot = gr.Chatbot(label="Conversation", height=500, type="messages")
+            chatbot = gr.Chatbot(label="Conversation", height=500)
             with gr.Row():
                 textbox = gr.Textbox(label="Type your question here:", placeholder="PM Kisan yojana kya hai?", scale=3)
                 audiobox = gr.Audio(sources=["microphone"], type="filepath", label="Or, speak your question here:", scale=1)
@@ -87,5 +87,4 @@ class AssistantInterface:
 
         return chat_ui
 
-assistant_interface = AssistantInterface()
-chat_ui = assistant_interface.build_ui()
+

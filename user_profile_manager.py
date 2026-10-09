@@ -19,9 +19,9 @@ class UserProfileManager:
 
     def get_or_create_profile(self, session_id: str) -> dict:
         """Finds a user profile by session_id or creates a new one."""
-        result = self.client.table("user_profiles").select("*").eq("session_id", session_id).maybeSingle().execute()
+        result = self.client.table("user_profiles").select("*").eq("session_id", session_id).maybe_single().execute()
 
-        if result.data:
+        if result and result.data:
             return result.data
 
         profile_data = {

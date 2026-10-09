@@ -74,3 +74,8 @@ class TestInterfaceStructure:
     def test_build_ui_has_session_id_state(self):
         source = inspect.getsource(AssistantInterface.build_ui)
         assert "session_id" in source
+
+    def test_build_ui_uses_messages_format(self):
+        """Chatbot should use the messages format (dict with role/content)."""
+        source = inspect.getsource(AssistantInterface.predict)
+        assert '"role"' in source and '"content"' in source
