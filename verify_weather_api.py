@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-API_KEY = os.environ.get("OPENWEATHERMAP_API_KEY")
+API_KEY = os.environ.get("OPENWEATHERMAP_API_KEY") or os.environ.get("OPENWEATHER_API_KEY")
 CITY = "Mumbai"
 
 if not API_KEY:

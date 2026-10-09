@@ -40,7 +40,7 @@ class LLMHandler:
     def get_weather(self, city: str) -> str:
         """Gets the current weather for a specified city using OpenWeatherMap API."""
         print(f"---TOOL: Getting weather for {city}---")
-        api_key = os.environ.get("OPENWEATHERMAP_API_KEY")
+        api_key = os.environ.get("OPENWEATHERMAP_API_KEY") or os.environ.get("OPENWEATHER_API_KEY")
         if not api_key:
             return "Weather API key not configured."
         
@@ -147,15 +147,18 @@ New Delhi mein aaj mausam saaf aur dhoop wala rahega. Zyada se zyada ताप�
         """Checks the assistant's final response for safety."""
         try:
             response = self.client.chat.completions.create(
-                model=LLAMA_GUARD_MODEL_ID,
-                messages=[{"role": "user", "content": f"[CONVERSATION]\nUser: {user_query}\nAssistant: {assistant_response}\n[/CONVERSATION]\n\n[TASK]Is the assistant's response safe? Answer with only 'safe' or 'unsafe'.[/TASK]"}],
-                max_tokens=10, stream=False
+                model=GROQ_MODEL_ID,
+                messages=[
+                    {"role": "system", "content": "You are a safety classifier. Analyze the conversation and respond with only one word: 'safe' or 'unsafe'. Unsafe means the response contains harmful, dangerous, illegal, or inappropriate content."},
+                    {"role": "user", "content": f"User: {user_query}\nAssistant: {assistant_response}\n\nIs the assistant's response safe or unsafe? Reply with only 'safe' or 'unsafe'."}
+                ],
+                max_tokens=100, stream=False
             )
-            moderation_result = response.choices[0].message.content.lower()
-            print(f"Llama Guard check -> Result: '{moderation_result}'")
-            return "safe" in moderation_result
+            moderation_result = response.choices[0].message.content.lower().strip()
+            print(f"Safety check -> Result: '{moderation_result}'")
+            return "unsafe" not in moderation_result
         except Exception as e:
-            print(f"An error occurred with Llama Guard: {e}")
-            return False
+            print(f"An error occurred during safety check: {e}")
+            return True
 
 llm_handler = LLMHandler()

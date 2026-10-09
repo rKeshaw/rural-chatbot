@@ -16,7 +16,7 @@ router_llm = None
 def _get_router_llm():
     global router_llm
     if router_llm is None:
-        router_llm = ChatGroq(temperature=0, model_name="llama-3.1-8b-instant")
+        router_llm = ChatGroq(temperature=0, model_name="openai/gpt-oss-20b")
     return router_llm
 
 def route_logic(state: AgentState):

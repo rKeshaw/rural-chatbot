@@ -13,7 +13,7 @@ load_dotenv()
 
 HAS_GROQ_KEY = bool(os.environ.get("GROQ_API_KEY"))
 HAS_TAVILY_KEY = bool(os.environ.get("TAVILY_API_KEY"))
-HAS_OPENWEATHER_KEY = bool(os.environ.get("OPENWEATHERMAP_API_KEY"))
+HAS_OPENWEATHER_KEY = bool(os.environ.get("OPENWEATHERMAP_API_KEY") or os.environ.get("OPENWEATHER_API_KEY"))
 
 pytestmark = pytest.mark.skipif(not HAS_GROQ_KEY, reason="GROQ_API_KEY not set")
 

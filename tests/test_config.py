@@ -19,7 +19,7 @@ from config import (
 
 
 def test_groq_model_id_is_valid():
-    assert GROQ_MODEL_ID == "llama-3.1-8b-instant"
+    assert GROQ_MODEL_ID == "openai/gpt-oss-20b"
 
 def test_whisper_model_id_is_correct():
     """The Whisper model should be a speech transcription model, not a chat model."""
