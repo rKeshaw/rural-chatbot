@@ -35,7 +35,7 @@ User message: "${userText}"`;
 
   const resp = await groqChat(
     [{ role: "user", content: routerPrompt }],
-    { max_tokens: 20, temperature: 0 }
+    { max_tokens: 200, temperature: 0 }
   );
   if (!resp.ok) return "general";
   const data = (await resp.json()) as {
@@ -74,7 +74,7 @@ export async function handleChat(
         },
         { role: "user", content: userText },
       ],
-      { max_tokens: 20, temperature: 0 }
+      { max_tokens: 200, temperature: 0 }
     );
     let city = userText;
     if (cityResp.ok) {

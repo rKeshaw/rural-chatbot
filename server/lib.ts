@@ -110,7 +110,7 @@ export async function isResponseSafe(
           content: `User: ${userQuery}\nAssistant: ${assistantResponse}\n\nIs the assistant's response safe or unsafe? Reply with only 'safe' or 'unsafe'.`,
         },
       ],
-      { max_tokens: 100 }
+      { max_tokens: 200 }
     );
     if (!resp.ok) return true;
     const data = (await resp.json()) as {
