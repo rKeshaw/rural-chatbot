@@ -251,7 +251,13 @@ export default function App() {
               msg.role === "user" ? styles.userMessage : styles.assistantMessage
             }
           >
-            <div style={styles.messageBubble}>
+            <div
+              style={{
+                ...styles.messageBubble,
+                background: msg.role === "user" ? "#0ea5e9" : "#f4f4f5",
+                color: msg.role === "user" ? "#fff" : "#18181b",
+              }}
+            >
               <div style={styles.messageText}>{msg.content}</div>
               {msg.role === "assistant" && msg.content && (
                 <button
@@ -387,8 +393,8 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "left",
     transition: "all 0.2s",
   },
-  userMessage: { display: "flex", justifyContent: "flex-end" },
-  assistantMessage: { display: "flex", justifyContent: "flex-start" },
+  userMessage: { display: "flex", justifyContent: "flex-end", animation: "slideUp 0.3s ease-out" },
+  assistantMessage: { display: "flex", justifyContent: "flex-start", animation: "slideUp 0.3s ease-out" },
   messageBubble: {
     maxWidth: "80%",
     padding: "12px 16px",

@@ -21,12 +21,18 @@ export async function searchKnowledgeBase(
   entriesCache = entries;
   if (!entries.length) return "";
 
-  const queryWords = new Set(query.toLowerCase().split(/\s+/));
+  const queryWords = new Set(
+    query.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, "")).filter(Boolean)
+  );
   const scored: { score: number; entry: Record<string, string> }[] = [];
 
   for (const entry of entries) {
     const contentWords = new Set(
-      (entry.content || "").toLowerCase().split(/\s+/)
+      (entry.content || "")
+        .toLowerCase()
+        .split(/\s+/)
+        .map((w) => w.replace(/[^a-z0-9]/g, ""))
+        .filter(Boolean)
     );
     let score = 0;
     for (const w of queryWords) if (contentWords.has(w)) score++;
