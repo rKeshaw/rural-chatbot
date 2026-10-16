@@ -11,12 +11,14 @@ type Message = { role: string; content: string };
 
 const SYSTEM_PROMPT = `You are Gram Sahayak, a helpful AI assistant for rural India.
 
-CRITICAL LANGUAGE RULE: Always reply in Hinglish only — Hindi written in English/Roman letters (e.g. "kya hai", "aapko", "milta hai"). NEVER write in Devanagari script. This is non-negotiable.
-
 You help farmers and rural citizens with questions about:
 - Government schemes (PM Kisan, Ayushman Bharat, MGNREGA, crop insurance, etc.)
 - Weather and agriculture
 - General knowledge and daily life questions
+
+LANGUAGE RULES:
+- Match the user's script. If they write in Devanagari, reply in Devanagari Hindi. If they write in Hinglish (Roman letters), reply in Hinglish.
+- Never switch scripts mid-response.
 
 RESPONSE RULES:
 - Keep answers SHORT — maximum 4-5 lines for simple questions, max 8-10 lines for complex ones.
@@ -24,7 +26,16 @@ RESPONSE RULES:
 - Give the most important info first. Do not add a "Sources:" line or footnotes.
 - Do not write long reports, essays, or information dumps. A farmer asking "kya hai?" wants a 2-3 line answer, not a full article.
 - Be practical, friendly, and to the point.
-- If the user asks about a place, give a 2-3 line summary, not a full district report.`;
+- If the user asks about a place, give a 2-3 line summary, not a full district report.
+
+ACCURACY RULES — CRITICAL:
+- If you are given "Web search results" or "Knowledge base information" below, you MUST base your answer ONLY on that data. Do NOT add facts from your own memory.
+- If the provided data does not contain the answer, say you don't have that information rather than guessing.
+- Never make up numbers, dates, statistics, or details that are not in the provided data.`;
+
+function detectScript(text: string): "devanagari" | "hinglish" {
+  return /[\u0900-\u097F]/.test(text) ? "devanagari" : "hinglish";
+}
 
 async function routeQuery(
   messages: Message[]
@@ -32,19 +43,21 @@ async function routeQuery(
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const userText = lastUser?.content ?? "";
 
-  const routerPrompt = `You are a query router. Given the user's message, classify it into exactly one of these categories:
-- "general" — greetings, small talk, general knowledge, advice
-- "web_search" — current events, latest news, real-time information, things requiring up-to-date data
-- "weather" — weather queries for a specific city or place
-- "knowledge_base" — questions about Indian government schemes (PM Kisan, Ayushman Bharat, MGNREGA, Kisan Credit Card, crop insurance, soil health card, etc.)
+  const routerPrompt = `You are a query router. Classify the user's message into exactly ONE category. Output only the category name, nothing else.
 
-Respond with ONLY the category name, nothing else.
+Categories:
+- knowledge_base: Questions specifically about Indian government schemes by name (PM Kisan, Ayushman Bharat, PMJAY, MGNREGA, Kisan Credit Card, KCC, Fasal Bima Yojana, PMFBY, Soil Health Card)
+- web_search: Questions about current events, real-time data, latest news, GDP, population, facts about specific places/cities/districts, geography, history, or anything requiring factual up-to-date information
+- weather: Weather queries for a specific city or place
+- general: Greetings, small talk, advice, or simple questions that don't need external data
 
-User message: "${userText}"`;
+User message: "${userText}"
+
+Category:`;
 
   const resp = await groqChat(
     [{ role: "user", content: routerPrompt }],
-    { max_tokens: 200, temperature: 0 }
+    { max_tokens: 500, temperature: 0 }
   );
   if (!resp.ok) return "general";
   const data = (await resp.json()) as {
@@ -67,23 +80,31 @@ export async function handleChat(
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const userText = lastUser?.content ?? "";
 
-  let systemPrompt = SYSTEM_PROMPT;
+  const userScript = detectScript(userText);
+  const scriptInstruction =
+    userScript === "devanagari"
+      ? "\n\nIMPORTANT: The user wrote in Devanagari. You MUST reply in Devanagari Hindi script."
+      : "\n\nIMPORTANT: The user wrote in Hinglish (Roman letters). You MUST reply in Hinglish (Roman letters), never Devanagari.";
+
+  let systemPrompt = SYSTEM_PROMPT + scriptInstruction;
   let contextInfo = "";
 
   if (route === "web_search") {
     const searchResults = await tavilySearch(userText);
-    contextInfo = `\n\nWeb search results:\n${searchResults}\n\nUse this information to answer the user's question.`;
+    if (searchResults) {
+      contextInfo = `\n\nWeb search results (use ONLY this data, do not add your own facts):\n${searchResults}\n\nAnswer the user's question using ONLY the information above. If the search results don't contain the answer, say you don't have that information.`;
+    }
   } else if (route === "weather") {
     const cityResp = await groqChat(
       [
         {
           role: "system",
           content:
-            "Extract the city name from the user's weather query. Respond with ONLY the city name, nothing else.",
+            "Extract the city name from the user's weather query. Respond with ONLY the city name in English, nothing else.",
         },
         { role: "user", content: userText },
       ],
-      { max_tokens: 200, temperature: 0 }
+      { max_tokens: 500, temperature: 0 }
     );
     let city = userText;
     if (cityResp.ok) {
@@ -97,14 +118,38 @@ export async function handleChat(
     onToken(weatherInfo);
     return weatherInfo;
   } else if (route === "knowledge_base") {
-    const kbResults = await searchKnowledgeBase(userText);
-    if (kbResults) {
-      contextInfo = `\n\nKnowledge base information:\n${kbResults}\n\nUse this information to answer the user's question about the government scheme.`;
-    } else {
-      onToken(
-        "Maaf kijiye, is vishay par mere paas abhi jankari nahi hai. Aap apne nearest CSC (Common Service Center) se madad le sakte hain."
+    // If the query is in Devanagari, translate to English for KB matching
+    let searchQuery = userText;
+    if (userScript === "devanagari") {
+      const transResp = await groqChat(
+        [
+          {
+            role: "system",
+            content:
+              "Translate the user message to English. Output ONLY the English translation, nothing else.",
+          },
+          { role: "user", content: userText },
+        ],
+        { max_tokens: 500, temperature: 0 }
       );
-      return "Maaf kijiye, is vishay par mere paas abhi jankari nahi hai. Aap apne nearest CSC (Common Service Center) se madad le sakte hain.";
+      if (transResp.ok) {
+        const transData = (await transResp.json()) as {
+          choices: { message: { content: string } }[];
+        };
+        const translated = transData.choices[0]?.message?.content?.trim();
+        if (translated && translated.length > 0) searchQuery = translated;
+      }
+    }
+    const kbResults = await searchKnowledgeBase(searchQuery);
+    if (kbResults) {
+      contextInfo = `\n\nKnowledge base information (use ONLY this data, do not add your own facts):\n${kbResults}\n\nAnswer the user's question using ONLY the information above. If the knowledge base doesn't contain the answer, say you don't have that information.`;
+    } else {
+      const fallback =
+        userScript === "devanagari"
+          ? "माफ कीजिए, इस विषय पर मेरे पास अभी जानकारी नहीं है। आप अपने नजदीकी CSC (Common Service Center) से मदद ले सकते हैं।"
+          : "Maaf kijiye, is vishay par mere paas abhi jankari nahi hai. Aap apne nearest CSC (Common Service Center) se madad le sakte hain.";
+      onToken(fallback);
+      return fallback;
     }
   }
 
@@ -113,7 +158,7 @@ export async function handleChat(
     ...messages,
   ];
 
-  const resp = await groqChat(fullMessages, { stream: true, max_tokens: 500 });
+  const resp = await groqChat(fullMessages, { stream: true, max_tokens: 600 });
   if (!resp.ok || !resp.body) {
     onToken("Maaf kijiye, abhi ek takneeki samasya aa gayi hai.");
     return "Maaf kijiye, abhi ek takneeki samasya aa gayi hai.";
