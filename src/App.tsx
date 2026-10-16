@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 
 type Message = {
   role: "user" | "assistant";
@@ -28,6 +29,7 @@ export default function App() {
   });
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -40,10 +42,26 @@ export default function App() {
     scrollToBottom();
   }, [state.messages, scrollToBottom]);
 
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    const onEnd = () => setSpeakingIndex(null);
+    synth.addEventListener("end", onEnd);
+    return () => {
+      synth.removeEventListener("end", onEnd);
+      synth.cancel();
+    };
+  }, []);
+
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || state.isLoading) return;
+
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        setSpeakingIndex(null);
+      }
 
       const sessionId = getSessionId();
       const userMessage: Message = { role: "user", content: trimmed };
@@ -73,7 +91,6 @@ export default function App() {
         const decoder = new TextDecoder();
         let buffer = "";
         let assistantText = "";
-        let replaced = false;
 
         // Add empty assistant message that we'll update
         setState((prev) => ({
@@ -109,7 +126,6 @@ export default function App() {
                     return { ...prev, messages: msgs };
                   });
                 } else if (currentEvent === "replace" && data.text) {
-                  replaced = true;
                   assistantText = data.text;
                   setState((prev) => {
                     const msgs = [...prev.messages];
@@ -203,14 +219,20 @@ export default function App() {
     setIsRecording(false);
   };
 
-  const readAloud = (text: string) => {
-    if (!text.trim()) return;
-    if ("speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "hi-IN";
-      utterance.rate = 0.9;
-      speechSynthesis.speak(utterance);
+  const readAloud = (text: string, index: number) => {
+    if (!text.trim() || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    if (speakingIndex === index) {
+      synth.cancel();
+      setSpeakingIndex(null);
+      return;
     }
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "hi-IN";
+    utterance.rate = 0.9;
+    setSpeakingIndex(index);
+    synth.speak(utterance);
   };
 
   return (
@@ -258,14 +280,40 @@ export default function App() {
                 color: msg.role === "user" ? "#fff" : "#18181b",
               }}
             >
-              <div style={styles.messageText}>{msg.content}</div>
+              <div style={styles.messageText}>
+                {msg.role === "assistant" ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p style={styles.mdP}>{children}</p>,
+                      strong: ({ children }) => (
+                        <strong style={styles.mdStrong}>{children}</strong>
+                      ),
+                      ul: ({ children }) => <ul style={styles.mdUl}>{children}</ul>,
+                      ol: ({ children }) => <ol style={styles.mdOl}>{children}</ol>,
+                      li: ({ children }) => <li style={styles.mdLi}>{children}</li>,
+                      h3: ({ children }) => <h3 style={styles.mdH3}>{children}</h3>,
+                      h4: ({ children }) => <h4 style={styles.mdH4}>{children}</h4>,
+                      blockquote: ({ children }) => (
+                        <blockquote style={styles.mdBlockquote}>{children}</blockquote>
+                      ),
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                ) : (
+                  msg.content
+                )}
+              </div>
               {msg.role === "assistant" && msg.content && (
                 <button
-                  style={styles.readAloudBtn}
-                  onClick={() => readAloud(msg.content)}
-                  title="Read aloud"
+                  style={{
+                    ...styles.readAloudBtn,
+                    opacity: speakingIndex === i ? 1 : 0.6,
+                  }}
+                  onClick={() => readAloud(msg.content, i)}
+                  title={speakingIndex === i ? "Stop reading" : "Read aloud"}
                 >
-                  🔊
+                  {speakingIndex === i ? "⏹" : "🔊"}
                 </button>
               )}
             </div>
@@ -396,7 +444,7 @@ const styles: Record<string, React.CSSProperties> = {
   userMessage: { display: "flex", justifyContent: "flex-end", animation: "slideUp 0.3s ease-out" },
   assistantMessage: { display: "flex", justifyContent: "flex-start", animation: "slideUp 0.3s ease-out" },
   messageBubble: {
-    maxWidth: "80%",
+    maxWidth: "85%",
     padding: "12px 16px",
     borderRadius: "16px",
     display: "flex",
@@ -404,15 +452,30 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "8px",
     flexWrap: "wrap",
   },
-  messageText: { fontSize: "15px", lineHeight: 1.6, flex: 1 },
+  messageText: { fontSize: "15px", lineHeight: 1.6, flex: 1, minWidth: 0 },
+  mdP: { margin: 0, marginBottom: "8px" },
+  mdP_last: { margin: 0 },
+  mdStrong: { fontWeight: 600 },
+  mdUl: { margin: "4px 0 8px 0", paddingLeft: "20px" },
+  mdOl: { margin: "4px 0 8px 0", paddingLeft: "20px" },
+  mdLi: { marginBottom: "4px", lineHeight: 1.5 },
+  mdH3: { fontSize: "15px", fontWeight: 600, marginTop: "8px", marginBottom: "4px" },
+  mdH4: { fontSize: "14px", fontWeight: 600, marginTop: "6px", marginBottom: "4px" },
+  mdBlockquote: {
+    borderLeft: "3px solid #d4d4d8",
+    paddingLeft: "12px",
+    margin: "8px 0",
+    fontSize: "14px",
+    opacity: 0.8,
+  },
   readAloudBtn: {
     background: "none",
     border: "none",
     cursor: "pointer",
     fontSize: "18px",
     padding: "2px 4px",
-    opacity: 0.6,
     flexShrink: 0,
+    transition: "opacity 0.2s",
   },
   typingIndicator: {
     display: "flex",
